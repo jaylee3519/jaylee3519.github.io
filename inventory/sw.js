@@ -1,6 +1,6 @@
 // 앱 화면을 캐시해 인터넷이 약해도 열리도록 함 (재고 데이터는 캐시하지 않음)
-const CACHE = 'inventory-v1';
-const ASSETS = ['./', 'index.html', 'lib/html5-qrcode.min.js', 'manifest.webmanifest', 'icon.svg'];
+const CACHE = 'inventory-v2';
+const ASSETS = ['./', 'index.html', 'core.js', 'lib/html5-qrcode.min.js', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
