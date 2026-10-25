@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>매장 재고관리</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #f4f6f9; --surface: #fff; --surface2: #eef1f5; --text: #17202b; --muted: #637083;
+    --line: #dde2ea; --accent: #1f6feb; --accent-text: #fff; --in: #17803d; --out: #c4342b;
+    --warn-bg: #fdecea; --warn: #c4342b; --shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f141a; --surface: #182029; --surface2: #222c37; --text: #e8edf3; --muted: #94a1b2;
+      --line: #2c3743; --accent: #4c8dff; --accent-text: #fff; --in: #3fbf6a; --out: #ff6b5f;
+      --warn-bg: #3a1d1b; --warn: #ff7b70; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  .hidden { display: none !important; }
+
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: calc(10px + env(safe-area-inset-top)) 16px 8px; }
+  .top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .top h1 { font-size: 20px; margin: 0; flex: 1; }
+  .status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--in); } .dot.err { background: var(--out); }
+  .icon-btn { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; color: var(--text); }
+  .icon-btn:active { background: var(--surface2); }
+  svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .search { display: flex; gap: 8px; }
+  .search input { flex: 1; min-width: 0; height: 48px; border: 1px solid var(--line); border-radius: 12px; padding: 0 14px; background: var(--surface); }
+  .search input:focus, .field input:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .scan-btn { height: 48px; padding: 0 16px; border-radius: 12px; background: var(--accent); color: var(--accent-text); display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+  .chips { display: flex; gap: 6px; margin-top: 10px; overflow-x: auto; }
+  .chip { padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 14px; white-space: nowrap; }
+  .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .chip .n { opacity: .7; margin-left: 2px; }
+
+  main { padding: 4px 16px; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .card { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); text-align: left; width: 100%; }
+  .card .info { flex: 1; min-width: 0; }
+  .card .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .sub { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qty { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+  .low .qty { color: var(--warn); }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; color: var(--warn); background: var(--warn-bg); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px; }
+  .empty { text-align: center; color: var(--muted); padding: 48px 16px; }
+  .empty button { margin-top: 12px; }
+
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  .tabs button { flex: 1; padding: 8px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; color: var(--muted); }
+  .tabs button.on { color: var(--accent); font-weight: 600; }
+  .fab { position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 6; height: 52px; padding: 0 20px; border-radius: 26px; background: var(--accent); color: var(--accent-text); font-weight: 600; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+
+  .log-item { background: var(--surface); border-radius: 12px; padding: 10px 14px; display: flex; gap: 10px; align-items: center; box-shadow: var(--shadow); }
+  .log-item .info { flex: 1; min-width: 0; }
+  .delta { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .delta.plus { color: var(--in); } .delta.minus { color: var(--out); }
+  .day { font-size: 13px; font-weight: 600; color: var(--muted); margin: 12px 2px 2px; }
+
+  /* 모달 / 바텀시트 */
+  .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); animation: up .18s ease-out; }
+  @keyframes up { from { transform: translateY(30px); opacity: .5; } }
+  @media (min-width: 600px) { .overlay { align-items: center; } .sheet { border-radius: 18px; } }
+  .sheet-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .sheet-head h2 { flex: 1; margin: 6px 0 0; font-size: 20px; word-break: break-all; }
+  .meta { color: var(--muted); font-size: 14px; word-break: break-all; }
+  .big-qty { text-align: center; margin: 16px 0; }
+  .big-qty .label { font-size: 13px; color: var(--muted); }
+  .big-qty .num { font-size: 52px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .big-qty.low .num { color: var(--warn); }
+  .stepper { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 12px; }
+  .stepper button { width: 52px; height: 52px; border-radius: 14px; background: var(--surface2); font-size: 26px; font-weight: 600; }
+  .stepper input { width: 110px; height: 52px; text-align: center; font-size: 24px; font-weight: 700; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  .row > * { flex: 1; }
+  .btn { height: 50px; border-radius: 12px; font-weight: 600; background: var(--surface2); display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .btn.primary { background: var(--accent); color: var(--accent-text); }
+  .btn.in { background: var(--in); color: #fff; }
+  .btn.out { background: var(--out); color: #fff; }
+  .btn.danger { color: var(--out); }
+  .btn.small { height: 40px; font-size: 14px; }
+  .btn:disabled { opacity: .5; }
+  .field { display: block; margin-bottom: 12px; }
+  .field > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field textarea, .field select { width: 100%; height: 46px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; background: var(--surface); }
+  .field textarea { height: 70px; padding: 10px 12px; resize: vertical; }
+  .field .with-btn { display: flex; gap: 6px; }
+  .field .with-btn button { flex: none; width: 46px; border-radius: 10px; background: var(--surface2); display: grid; place-items: center; }
+  .hint { font-size: 13px; color: var(--muted); }
+  .section { font-size: 14px; font-weight: 700; margin: 18px 0 8px; }
+  .mini-log { display: flex; flex-direction: column; gap: 6px; }
+  .mini-log div { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; border-bottom: 1px solid var(--line); padding: 6px 0; }
+  .mini-log .m { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .seg { display: flex; background: var(--surface2); border-radius: 12px; padding: 3px; }
+  .seg button { flex: 1; height: 40px; border-radius: 9px; font-weight: 600; font-size: 15px; color: var(--muted); }
+  .seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+  details { background: var(--surface2); border-radius: 12px; padding: 10px 14px; margin-top: 12px; }
+  details summary { font-weight: 600; cursor: pointer; }
+  details ol { padding-left: 20px; margin: 8px 0 0; font-size: 14px; }
+  details li { margin-bottom: 6px; }
+  code { background: var(--surface); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
+
+  /* 스캐너 */
+  #scanner { position: fixed; inset: 0; z-index: 30; background: #000; color: #fff; display: flex; flex-direction: column; }
+  #scanner .bar { display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; }
+  #scanner .bar .title { flex: 1; font-weight: 600; }
+  #scanner .icon-btn { color: #fff; }
+  #readerWrap { flex: 1; display: flex; align-items: center; overflow: hidden; }
+  #reader { width: 100%; }
+  #scanner .bottom { padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+  #scanner .seg { background: #222; }
+  #scanner .seg button { color: #aaa; }
+  #scanner .seg button.on { background: #fff; color: #000; }
+  #scanner .btn { background: #222; color: #fff; }
+  #scanMsg { min-height: 24px; text-align: center; font-weight: 600; }
+
+  #toast { position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 50; background: #222; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 15px; max-width: calc(100% - 32px); text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  #toast.err { background: #b3261e; }
+  #busy { position: fixed; top: 0; left: 0; height: 3px; width: 100%; z-index: 60; background: linear-gradient(90deg, transparent, var(--accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: slide 1s linear infinite; }
+  @keyframes slide { from { background-position: -50% 0; } to { background-position: 150% 0; } }
+</style>
+</head>
+<body>
+
+<div id="busy" class="hidden"></div>
+
+<header>
+  <div class="top">
+    <h1>재고관리</h1>
+    <span class="status"><span class="dot" id="dot"></span><span id="statusText"></span></span>
+    <button class="icon-btn" id="refreshBtn" aria-label="새로고침"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+    <button class="icon-btn" id="settingsBtn" aria-label="설정"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+  <div class="search">
+    <input id="q" type="search" placeholder="상품명 · 코드 · 위치 검색" autocomplete="off" enterkeyhint="search">
+    <button class="scan-btn" id="scanBtn"><svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>스캔</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</header>
+
+<main>
+  <section id="tab-stock"><div class="list" id="list"></div></section>
+  <section id="tab-log" class="hidden"><div class="list" id="logList"></div></section>
+</main>
+
+<button class="fab" id="addBtn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>상품 등록</button>
+
+<nav class="tabs">
+  <button class="on" data-tab="stock"><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>재고</button>
+  <button data-tab="log"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>입출고 기록</button>
+</nav>
+
+<!-- 상품 상세 -->
+<div class="overlay hidden" id="detail">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="dName"></h2>
+      <button class="icon-btn" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="meta" id="dMeta"></div>
+    <div class="big-qty" id="dQtyBox"><div class="label">현재 재고</div><div class="num" id="dQty"></div><div class="label" id="dMin"></div></div>
+    <div class="stepper">
+      <button id="dMinus" aria-label="1 줄이기">−</button>
+      <input id="dAmount" type="number" inputmode="numeric" min="0" value="1" aria-label="수량">
+      <button id="dPlus" aria-label="1 늘리기">+</button>
+    </div>
+    <label class="field"><input id="dMemo" placeholder="메모 (선택) 예: 거래처, 파손 등"></label>
+    <div class="row">
+      <button class="btn in" id="dIn">입고 +</button>
+      <button class="btn out" id="dOut">출고 −</button>
+    </div>
+    <div class="row"><button class="btn" id="dSet">실사: 재고를 이 수량으로 맞추기</button></div>
+    <div class="row">
+      <button class="btn small" id="dEdit">정보 수정</button>
+      <button class="btn small danger" id="dDelete">삭제</button>
+    </div>
+    <div class="section">최근 기록</div>
+    <div class="mini-log" id="dLog"><span class="hint">불러오는 중…</span></div>
+  </div>
+</div>
+
+<!-- 상품 등록/수정 -->
+<div class="overlay hidden" id="form">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="fTitle">상품 등록</h2>
+      <button class="icon-btn" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <form id="fForm" autocomplete="off">
+      <label class="field"><span>상품코드 (바코드) *</span>
+        <span class="with-btn"><input id="fCode" required inputmode="text" placeholder="바코드 스캔 또는 직접 입력">
+        <button type="button" id="fScan" aria-label="바코드 스캔"><svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg></button></span>
+      </label>
+      <label class="field"><span>상품명 *</span><input id="fName" required placeholder="예: 새우깡 90g"></label>
+      <label class="field" id="fQtyWrap"><span>현재 수량</span><input id="fQty" type="number" inputmode="numeric" value="0"></label>
+      <label class="field"><span>보관 위치</span><input id="fLoc" placeholder="예: A-3 선반, 창고"></label>
+      <label class="field"><span>최소 수량 (이하이면 '부족' 표시)</span><input id="fMin" type="number" inputmode="numeric" placeholder="비워두면 알림 없음"></label>
+      <label class="field"><span>메모</span><textarea id="fMemo"></textarea></label>
+      <button class="btn primary" style="width:100%" type="submit" id="fSubmit">저장</button>
+    </form>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div class="overlay hidden" id="settings">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>설정</h2>
+      <button class="icon-btn" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="field"><span>데이터 저장 위치</span>
+      <div class="seg" id="sMode"><button data-mode="sheet">구글 시트 (공유)</button><button data-mode="local">이 기기에만</button></div>
+    </div>
+    <div id="sSheetFields">
+      <label class="field"><span>Apps Script 웹 앱 URL</span><input id="sUrl" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url"></label>
+      <label class="field"><span>비밀번호 (Apps Script의 TOKEN)</span><input id="sToken" type="password"></label>
+    </div>
+    <label class="field"><span>작업자 이름 (기록에 남음)</span><input id="sUser" placeholder="예: 김민지"></label>
+    <div class="row">
+      <button class="btn" id="sTest">연결 테스트</button>
+      <button class="btn primary" id="sSave">저장</button>
+    </div>
+
+    <details id="sGuide">
+      <summary>구글 시트 연결 방법 (처음 1번만)</summary>
+      <ol>
+        <li>새 <b>구글 시트</b>를 만듭니다.</li>
+        <li>메뉴 <b>확장 프로그램 → Apps Script</b>를 엽니다.</li>
+        <li>기존 코드를 지우고 <a href="apps-script.gs" target="_blank">apps-script.gs</a> 내용을 전부 붙여넣습니다.</li>
+        <li>맨 위 <code>TOKEN = 'CHANGE-ME'</code>를 원하는 비밀번호로 바꾸고 저장합니다.</li>
+        <li><b>배포 → 새 배포 → 유형: 웹 앱</b>, 실행 사용자: <b>나</b>, 액세스 권한: <b>모든 사용자</b>로 배포합니다. (권한 승인 창이 뜨면 허용)</li>
+        <li>나오는 <b>웹 앱 URL</b>과 비밀번호를 위 칸에 넣고 저장합니다.</li>
+        <li>직원 폰에는 아래 <b>설정 링크 공유</b>로 보내면 한 번에 설정됩니다.</li>
+      </ol>
+    </details>
+
+    <div class="section">데이터</div>
+    <div class="row">
+      <button class="btn small" id="sExport">CSV 내보내기</button>
+      <button class="btn small" id="sImport">CSV 가져오기</button>
+    </div>
+    <div class="row">
+      <button class="btn small" id="sShare">설정 링크 공유 (직원 폰)</button>
+    </div>
+    <div class="row" id="sUploadRow">
+      <button class="btn small" id="sUpload">이 기기 데이터를 구글 시트로 보내기</button>
+    </div>
+    <p class="hint">CSV 열 순서: 코드, 상품명, 수량, 위치, 최소수량, 메모 (첫 줄 제목은 자동으로 건너뜀). 같은 코드가 있으면 덮어씁니다.</p>
+    <input type="file" id="sFile" accept=".csv,text/csv" class="hidden">
+  </div>
+</div>
+
+<!-- 스캐너 -->
+<div id="scanner" class="hidden">
+  <div class="bar">
+    <span class="title" id="scanTitle">바코드 스캔</span>
+    <button class="icon-btn" id="torchBtn" aria-label="플래시"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
+    <button class="icon-btn" id="scanClose" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div id="readerWrap"><div id="reader"></div></div>
+  <div class="bottom">
+    <div id="scanMsg"></div>
+    <div class="seg" id="scanMode">
+      <button data-mode="view" class="on">조회</button>
+      <button data-mode="in">입고 +1</button>
+      <button data-mode="out">출고 −1</button>
+    </div>
+    <button class="btn" id="scanPhoto">카메라가 안 되면: 사진 찍어서 인식</button>
+    <input type="file" id="scanFile" accept="image/*" capture="environment" class="hidden">
+  </div>
+</div>
+<div id="reader-file" class="hidden"></div>
+
+<div id="toast" class="hidden"></div>
+
+<script src="lib/html5-qrcode.min.js"></script>
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nowIso = () => new Date().toISOString();
+
+// ---------- 저장소 ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const settings = Object.assign({ mode: 'local', url: '', token: '', user: '' }, store.get('inv.settings', {}));
+let products = settings.mode === 'sheet' ? store.get('inv.cache', []) : localDb().products;
+let filter = 'all';
+let tab = 'stock';
+let currentCode = null;
+
+// ---------- 기기 저장 모드 (구글 시트 서버와 같은 동작) ----------
+function localDb() { return store.get('inv.local', { products: [], log: [] }); }
+function localRun(action, req) {
+  const db = localDb();
+  const find = (c) => db.products.find((p) => p.code === String(c ?? '').trim());
+  const log = (p, delta, type, memo, at) => db.log.push({ at: at || nowIso(), code: p.code, name: p.name, delta, qtyAfter: p.qty, type, memo: memo || '', user: req.user || '' });
+  const fields = (p, d) => {
+    if (d.location != null) p.location = String(d.location).trim();
+    if (d.memo != null) p.memo = String(d.memo).trim();
+    if (d.minQty !== undefined) p.minQty = d.minQty === '' || d.minQty == null ? '' : Number(d.minQty);
+  };
+  const change = (next, type) => {
+    const p = find(req.code);
+    if (!p) throw new Error('등록되지 않은 코드입니다: ' + req.code);
+    if (!isFinite(next(p))) throw new Error('수량이 올바르지 않습니다.');
+    const n = next(p), delta = n - p.qty;
+    p.qty = n; p.updatedAt = nowIso();
+    log(p, delta, type, req.memo);
+    return p;
+  };
+  let out;
+  switch (action) {
+    case 'list': out = { products: db.products }; break;
+    case 'save': {
+      const d = req.product || {};
+      const code = String(d.code || '').trim(), name = String(d.name || '').trim();
+      if (!code || !name) throw new Error('코드와 상품명은 꼭 입력해야 합니다.');
+      const orig = String(req.originalCode || '').trim() || code;
+      if (code !== orig && find(code)) throw new Error('이미 등록된 코드입니다: ' + code);
+      let p = find(orig);
+      if (!p) {
+        if (find(code)) throw new Error('이미 등록된 코드입니다: ' + code);
+        p = { code, name, qty: Number(d.qty) || 0, location: '', minQty: '', memo: '' };
+        fields(p, d); p.updatedAt = nowIso();
+        db.products.push(p); log(p, p.qty, '신규등록');
+      } else {
+        p.code = code; p.name = name; fields(p, d); p.updatedAt = nowIso();
+      }
+      out = p; break;
+    }
+    case 'adjust': {
+      const delta = Number(req.delta);
+      if (!isFinite(delta) || delta === 0) throw new Error('수량이 올바르지 않습니다.');
+      out = change((p) => p.qty + delta, req.type || (delta > 0 ? '입고' : '출고')); break;
+    }
+    case 'set': out = change(() => Number(req.qty), '실사'); break;
+    case 'delete': {
+      const p = find(req.code);
+      if (!p) throw new Error('등록되지 않은 코드입니다: ' + req.code);
+      db.products = db.products.filter((x) => x !== p); log(p, 0, '삭제');
+      out = { code: p.code }; break;
+    }
+    case 'log': {
+      const code = String(req.code || '').trim();
+      out = db.log.slice().reverse().filter((x) => !code || x.code === code).slice(0, req.limit || 100); break;
+    }
+    case 'import': {
+      let added = 0, updated = 0; const at = nowIso();
+      for (const d of req.products || []) {
+        const code = String(d.code || '').trim(); if (!code) continue;
+        const qty = d.qty === '' || d.qty == null ? NaN : Number(d.qty);
+        let p = find(code);
+        if (!p) {
+          p = { code, name: String(d.name || '').trim() || code, qty: isFinite(qty) ? qty : 0, location: '', minQty: '', memo: '' };
+          fields(p, d); p.updatedAt = at; db.products.push(p); log(p, p.qty, '가져오기', '', at); added++;
+        } else {
+          if (String(d.name || '').trim()) p.name = String(d.name).trim();
+          fields(p, d);
+          if (isFinite(qty) && qty !== p.qty) { const delta = qty - p.qty; p.qty = qty; log(p, delta, '가져오기', '', at); }
+          p.updatedAt = at; updated++;
+        }
+      }
+      out = { added, updated }; break;
+    }
+    default: throw new Error('알 수 없는 작업: ' + action);
+  }
+  if (db.log.length > 5000) db.log = db.log.slice(-5000);
+  store.set('inv.local', db);
+  return JSON.parse(JSON.stringify(out));
+}
+
+// ---------- API ----------
+let busyCount = 0;
+function busy(on) { busyCount += on ? 1 : -1; $('#busy').classList.toggle('hidden', busyCount <= 0); }
+
+async function api(action, req = {}) {
+  req = { ...req, user: settings.user };
+  if (settings.mode !== 'sheet') return localRun(action, req);
+  if (!settings.url) throw new Error('설정에서 구글 시트 URL을 먼저 입력하세요.');
+  busy(true);
+  try {
+    let res;
+    try {
+      res = await fetch(settings.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // CORS 사전요청 없이 Apps Script 호출
+        body: JSON.stringify({ ...req, action, token: settings.token }),
+      });
+    } catch {
+      setStatus('err');
+      throw new Error('서버에 연결할 수 없습니다. 인터넷 연결과 URL을 확인하세요.');
+    }
+    let j;
+    try { j = await res.json(); } catch { throw new Error('서버 응답을 읽을 수 없습니다. URL과 배포 권한(모든 사용자)을 확인하세요.'); }
+    if (!j.ok) throw new Error(j.error || '알 수 없는 오류');
+    setStatus('ok');
+    return j.data;
+  } finally { busy(false); }
+}
+
+function setStatus(state) {
+  const dot = $('#dot');
+  dot.className = 'dot' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : '');
+  $('#statusText').textContent = settings.mode === 'sheet' ? (state === 'err' ? '연결 오류' : '구글 시트') : '이 기기';
+}
+
+function cacheProducts() { if (settings.mode === 'sheet') store.set('inv.cache', products); }
+function upsert(p) {
+  const i = products.findIndex((x) => x.code === p.code);
+  if (i >= 0) products[i] = p; else products.push(p);
+  cacheProducts();
+}
+
+async function refresh(silent) {
+  try {
+    const data = await api('list');
+    products = data.products;
+    cacheProducts();
+    render();
+    if (tab === 'log') loadLog();
+    if (!silent) toast('최신 재고를 불러왔습니다');
+  } catch (e) { if (!silent || settings.mode === 'sheet') toast(e.message, true); }
+}
+
+// ---------- 검색 ----------
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+const cho = (s) => [...s].map((c) => { const n = c.charCodeAt(0) - 0xac00; return n >= 0 && n < 11172 ? CHO[Math.floor(n / 588)] : c; }).join('');
+const norm = (s) => String(s ?? '').toLowerCase().replace(/\s+/g, '');
+const isLow = (p) => p.minQty !== '' && p.minQty != null && Number(p.qty) <= Number(p.minQty);
+function matches(p, q) {
+  const name = norm(p.name);
+  return name.includes(q) || norm(p.code).includes(q) || norm(p.location).includes(q)
+    || (/^[ㄱ-ㅎ]+$/.test(q) && cho(name).includes(q));
+}
+function visible() {
+  const q = norm($('#q').value);
+  let list = products;
+  if (filter === 'low') list = list.filter(isLow);
+  if (filter === 'zero') list = list.filter((p) => Number(p.qty) <= 0);
+  if (q) list = list.filter((p) => matches(p, q));
+  return list.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko'));
+}
+
+// ---------- 화면 ----------
+function render() {
+  const low = products.filter(isLow).length, zero = products.filter((p) => Number(p.qty) <= 0).length;
+  $('#chips').innerHTML = [['all', '전체', products.length], ['low', '재고 부족', low], ['zero', '품절', zero]]
+    .map(([k, t, n]) => `<button class="chip ${filter === k ? 'on' : ''}" data-filter="${k}">${t}<span class="n">${n}</span></button>`).join('');
+
+  const list = visible();
+  const q = $('#q').value.trim();
+  if (!products.length) {
+    $('#list').innerHTML = `<div class="empty">아직 등록된 상품이 없습니다.<br>바코드를 스캔하거나 직접 등록해보세요.<br><button class="btn primary" style="padding:0 20px;margin:12px auto 0" onclick="openForm()">첫 상품 등록</button></div>`;
+    return;
+  }
+  if (!list.length) {
+    $('#list').innerHTML = `<div class="empty">검색 결과가 없습니다.${q ? `<br><button class="btn primary" style="padding:0 20px;margin:12px auto 0" id="addFromSearch">'${esc(q)}' 새로 등록</button>` : ''}</div>`;
+    const b = $('#addFromSearch');
+    if (b) b.onclick = () => openForm(null, /^[\w-]+$/.test(q) && /\d/.test(q) ? { code: q } : { name: q });
+    return;
+  }
+  $('#list').innerHTML = list.map((p) => `
+    <button class="card ${isLow(p) || Number(p.qty) <= 0 ? 'low' : ''}" data-code="${esc(p.code)}">
+      <div class="info">
+        <div class="name">${esc(p.name)}${Number(p.qty) <= 0 ? '<span class="badge">품절</span>' : isLow(p) ? '<span class="badge">부족</span>' : ''}</div>
+        <div class="sub">${esc(p.code)}${p.location ? ' · ' + esc(p.location) : ''}</div>
+      </div>
+      <div class="qty">${esc(p.qty)}</div>
+    </button>`).join('');
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso); if (isNaN(d)) return iso;
+  return d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function deltaHtml(x) {
+  if (x.type === '삭제') return '<span class="delta minus">삭제</span>';
+  const cls = x.delta > 0 ? 'plus' : x.delta < 0 ? 'minus' : '';
+  return `<span class="delta ${cls}">${x.delta > 0 ? '+' : ''}${x.delta}</span>`;
+}
+
+async function loadLog() {
+  const box = $('#logList');
+  box.innerHTML = '<div class="empty">불러오는 중…</div>';
+  try {
+    const items = await api('log', { limit: 200 });
+    if (!items.length) { box.innerHTML = '<div class="empty">아직 기록이 없습니다.</div>'; return; }
+    let lastDay = '';
+    box.innerHTML = items.map((x) => {
+      const d = new Date(x.at);
+      const day = isNaN(d) ? '' : d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+      const head = day !== lastDay ? `<div class="day">${esc(day)}</div>` : '';
+      lastDay = day;
+      return `${head}<button class="log-item" data-code="${esc(x.code)}">
+        <div class="info"><div class="name">${esc(x.name)} <span class="hint">· ${esc(x.type)}</span></div>
+        <div class="sub hint">${esc(fmtTime(x.at))}${x.user ? ' · ' + esc(x.user) : ''}${x.memo ? ' · ' + esc(x.memo) : ''} · 남은 수량 ${esc(x.qtyAfter)}</div></div>
+        ${deltaHtml(x)}</button>`;
+    }).join('');
+  } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+function switchTab(t) {
+  tab = t;
+  $$('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
+  $('#tab-stock').classList.toggle('hidden', t !== 'stock');
+  $('#tab-log').classList.toggle('hidden', t !== 'log');
+  $('.search').classList.toggle('hidden', t !== 'stock');
+  $('#chips').classList.toggle('hidden', t !== 'stock');
+  if (t === 'log') loadLog();
+}
+
+// ---------- 모달 ----------
+function show(id) { $('#' + id).classList.remove('hidden'); }
+function hide(id) { $('#' + id).classList.add('hidden'); if (id === 'detail') currentCode = null; }
+$$('.overlay').forEach((o) => {
+  o.addEventListener('click', (e) => { if (e.target === o || e.target.closest('[data-close]')) hide(o.id); });
+});
+
+let toastTimer;
+function toast(msg, err) {
+  const t = $('#toast');
+  t.textContent = msg; t.className = err ? 'err' : '';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), err ? 4000 : 2200);
+}
+
+// 상세
+function openDetail(code) {
+  const p = products.find((x) => x.code === code);
+  if (!p) return;
+  currentCode = code;
+  $('#dAmount').value = 1;
+  $('#dMemo').value = '';
+  fillDetail(p);
+  show('detail');
+  loadMiniLog(code);
+}
+function fillDetail(p) {
+  $('#dName').textContent = p.name;
+  $('#dMeta').textContent = [p.code, p.location && '위치 ' + p.location, p.memo].filter(Boolean).join(' · ');
+  $('#dQty').textContent = p.qty;
+  $('#dQtyBox').classList.toggle('low', isLow(p));
+  $('#dMin').textContent = p.minQty !== '' && p.minQty != null ? `최소 ${p.minQty}개${isLow(p) ? ' · 재고 부족' : ''}` : '';
+}
+async function loadMiniLog(code) {
+  const box = $('#dLog');
+  box.innerHTML = '<span class="hint">불러오는 중…</span>';
+  try {
+    const items = await api('log', { code, limit: 8 });
+    if (currentCode !== code) return;
+    box.innerHTML = items.length ? items.map((x) =>
+      `<div><span class="m">${esc(fmtTime(x.at))} · ${esc(x.type)}${x.user ? ' · ' + esc(x.user) : ''}${x.memo ? ' · ' + esc(x.memo) : ''}</span>${deltaHtml(x)}</div>`).join('')
+      : '<span class="hint">기록 없음</span>';
+  } catch (e) { box.innerHTML = `<span class="hint">${esc(e.message)}</span>`; }
+}
+function amount() {
+  const n = Number($('#dAmount').value);
+  if (!isFinite(n) || n < 0 || !Number.isInteger(n)) { toast('수량을 0 이상의 정수로 입력하세요', true); return null; }
+  return n;
+}
+async function act(action, req, msg) {
+  const btns = $$('#detail .btn');
+  btns.forEach((b) => (b.disabled = true));
+  try {
+    const p = await api(action, { code: currentCode, memo: $('#dMemo').value.trim(), ...req });
+    upsert(p); render(); fillDetail(p);
+    $('#dMemo').value = ''; $('#dAmount').value = 1;
+    toast(msg(p)); vibrate();
+    loadMiniLog(p.code);
+  } catch (e) { toast(e.message, true); }
+  finally { btns.forEach((b) => (b.disabled = false)); }
+}
+$('#dMinus').onclick = () => { $('#dAmount').value = Math.max(0, (Number($('#dAmount').value) || 0) - 1); };
+$('#dPlus').onclick = () => { $('#dAmount').value = (Number($('#dAmount').value) || 0) + 1; };
+$('#dIn').onclick = () => { const n = amount(); if (n) act('adjust', { delta: n }, (p) => `입고 +${n} → 재고 ${p.qty}`); };
+$('#dOut').onclick = () => {
+  const n = amount(); if (!n) return;
+  const p = products.find((x) => x.code === currentCode);
+  if (p && p.qty - n < 0 && !confirm(`현재 재고(${p.qty})보다 많이 출고합니다. 계속할까요?`)) return;
+  act('adjust', { delta: -n }, (p) => `출고 −${n} → 재고 ${p.qty}`);
+};
+$('#dSet').onclick = () => {
+  const n = amount(); if (n == null) return;
+  const p = products.find((x) => x.code === currentCode);
+  if (!confirm(`'${p.name}' 재고를 ${p.qty} → ${n}(으)로 맞출까요?`)) return;
+  act('set', { qty: n }, (p) => `재고를 ${p.qty}(으)로 맞췄습니다`);
+};
+$('#dEdit').onclick = () => { const p = products.find((x) => x.code === currentCode); hide('detail'); openForm(p); };
+$('#dDelete').onclick = async () => {
+  const p = products.find((x) => x.code === currentCode);
+  if (!confirm(`'${p.name}' 상품을 삭제할까요? (기록은 남습니다)`)) return;
+  try {
+    await api('delete', { code: p.code });
+    products = products.filter((x) => x.code !== p.code); cacheProducts();
+    hide('detail'); render(); toast('삭제했습니다');
+  } catch (e) { toast(e.message, true); }
+};
+
+// 등록/수정
+let editing = null;
+function openForm(p, preset = {}) {
+  editing = p || null;
+  $('#fTitle').textContent = p ? '상품 정보 수정' : '상품 등록';
+  $('#fCode').value = p ? p.code : preset.code || '';
+  $('#fName').value = p ? p.name : preset.name || '';
+  $('#fQty').value = 0;
+  $('#fQtyWrap').classList.toggle('hidden', !!p);
+  $('#fLoc').value = p ? p.location || '' : '';
+  $('#fMin').value = p && p.minQty !== '' && p.minQty != null ? p.minQty : '';
+  $('#fMemo').value = p ? p.memo || '' : '';
+  show('form');
+  setTimeout(() => ($('#fCode').value ? $('#fName') : $('#fCode')).focus(), 50);
+}
+$('#fForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const product = {
+    code: $('#fCode').value.trim(), name: $('#fName').value.trim(),
+    location: $('#fLoc').value, minQty: $('#fMin').value, memo: $('#fMemo').value,
+  };
+  if (!editing) product.qty = $('#fQty').value;
+  $('#fSubmit').disabled = true;
+  try {
+    const p = await api('save', { product, originalCode: editing ? editing.code : '' });
+    if (editing && editing.code !== p.code) products = products.filter((x) => x.code !== editing.code);
+    upsert(p); render(); hide('form');
+    toast(editing ? '수정했습니다' : '등록했습니다');
+    openDetail(p.code);
+  } catch (err) { toast(err.message, true); }
+  finally { $('#fSubmit').disabled = false; }
+};
+$('#fScan').onclick = () => openScanner({ title: '상품코드 스캔', modes: false, onCode: (c) => { closeScanner(); $('#fCode').value = c; $('#fName').focus(); } });
+
+// ---------- 스캐너 ----------
+let scanner = null, scanOpts = null, scanMode = 'view', lastScan = { code: '', at: 0 }, torchOn = false, scanQueue = Promise.resolve();
+function vibrate() { try { navigator.vibrate && navigator.vibrate(60); } catch {} }
+function beep() {
+  try {
+    const ctx = beep.ctx || (beep.ctx = new (window.AudioContext || window.webkitAudioContext)());
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 1500; g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + 0.08);
+  } catch {}
+}
+function scanMsg(t, color) { $('#scanMsg').textContent = t; $('#scanMsg').style.color = color || '#fff'; }
+
+async function openScanner(opts) {
+  scanOpts = opts;
+  $('#scanTitle').textContent = opts.title || '바코드 스캔';
+  $('#scanMode').classList.toggle('hidden', !opts.modes);
+  scanMsg('바코드를 네모 칸 안에 맞춰주세요');
+  $('#scanner').classList.remove('hidden');
+  $('#torchBtn').classList.add('hidden');
+  torchOn = false;
+  if (typeof Html5Qrcode === 'undefined') { scanMsg('스캐너를 불러오지 못했습니다. 사진 인식을 이용하세요.', '#ff7b70'); return; }
+  try {
+    scanner = scanner || new Html5Qrcode('reader', { verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 12, qrbox: (w, h) => ({ width: Math.max(50, Math.floor(w * 0.85)), height: Math.max(50, Math.floor(h * 0.45)) }) },
+      onScan, () => {}
+    );
+    try {
+      const caps = scanner.getRunningTrackCameraCapabilities();
+      if (caps.torchFeature().isSupported()) $('#torchBtn').classList.remove('hidden');
+    } catch {}
+  } catch (e) {
+    const m = String(e && (e.name || e.message || e));
+    scanMsg(/NotAllowed|Permission/i.test(m) ? '카메라 권한이 거부되었습니다. 브라우저 설정에서 허용하거나 사진 인식을 이용하세요.'
+      : '카메라를 열 수 없습니다. 아래 "사진 찍어서 인식"을 이용하세요.', '#ff7b70');
+  }
+}
+async function closeScanner() {
+  $('#scanner').classList.add('hidden');
+  if (scanner) { try { if (scanner.isScanning) await scanner.stop(); } catch {} }
+}
+function onScan(text) {
+  const code = String(text).trim();
+  const t = Date.now();
+  if (code === lastScan.code && t - lastScan.at < 2000) return; // 같은 바코드 연속 인식 방지
+  lastScan = { code, at: t };
+  beep(); vibrate();
+  scanQueue = scanQueue.then(() => handleCode(code));
+}
+async function handleCode(code) {
+  if (scanOpts && scanOpts.onCode) return scanOpts.onCode(code);
+  const p = products.find((x) => x.code === code);
+  if (!p) {
+    await closeScanner();
+    if (confirm(`등록되지 않은 코드입니다.\n${code}\n\n새 상품으로 등록할까요?`)) openForm(null, { code });
+    return;
+  }
+  if (scanMode === 'view') { await closeScanner(); openDetail(code); return; }
+  const delta = scanMode === 'in' ? 1 : -1;
+  try {
+    const np = await api('adjust', { code, delta });
+    upsert(np); render();
+    scanMsg(`${np.name}  ${delta > 0 ? '+1' : '−1'} → 재고 ${np.qty}`, delta > 0 ? '#3fbf6a' : '#ff8a80');
+  } catch (e) { scanMsg(e.message, '#ff7b70'); }
+}
+$('#scanBtn').onclick = () => openScanner({ title: '바코드 스캔', modes: true });
+$('#scanClose').onclick = closeScanner;
+$('#scanMode').onclick = (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  scanMode = b.dataset.mode;
+  $$('#scanMode button').forEach((x) => x.classList.toggle('on', x === b));
+  scanMsg(scanMode === 'view' ? '스캔하면 재고 현황을 보여줍니다' : scanMode === 'in' ? '스캔할 때마다 입고 +1 (연속 스캔)' : '스캔할 때마다 출고 −1 (연속 스캔)');
+};
+$('#torchBtn').onclick = async () => {
+  try { torchOn = !torchOn; await scanner.getRunningTrackCameraCapabilities().torchFeature().apply(torchOn); } catch {}
+};
+$('#scanPhoto').onclick = () => $('#scanFile').click();
+$('#scanFile').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  scanMsg('사진에서 바코드를 찾는 중…');
+  try {
+    if (scanner && scanner.isScanning) await scanner.stop();
+    const fileScanner = new Html5Qrcode('reader-file', { verbose: false });
+    const code = await fileScanner.scanFile(f, false);
+    lastScan = { code: '', at: 0 };
+    onScan(code);
+  } catch { scanMsg('바코드를 찾지 못했습니다. 밝은 곳에서 바코드를 크게 찍어주세요.', '#ff7b70'); }
+};
+
+// ---------- 설정 ----------
+function setModeUI(mode) {
+  $$('#sMode button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+  $('#sSheetFields').classList.toggle('hidden', mode !== 'sheet');
+  $('#sGuide').classList.toggle('hidden', mode !== 'sheet');
+  $('#sShare').parentElement.classList.toggle('hidden', mode !== 'sheet');
+  $('#sUploadRow').classList.toggle('hidden', mode !== 'sheet' || !localDb().products.length);
+}
+let pendingMode = settings.mode;
+function openSettings() {
+  pendingMode = settings.mode;
+  $('#sUrl').value = settings.url; $('#sToken').value = settings.token; $('#sUser').value = settings.user;
+  setModeUI(pendingMode);
+  show('settings');
+}
+$('#sMode').onclick = (e) => { const b = e.target.closest('button'); if (b) { pendingMode = b.dataset.mode; setModeUI(pendingMode); } };
+function readSettingsForm() {
+  return { mode: pendingMode, url: $('#sUrl').value.trim(), token: $('#sToken').value.trim(), user: $('#sUser').value.trim() };
+}
+function applySettings(s) {
+  const modeChanged = s.mode !== settings.mode || s.url !== settings.url;
+  Object.assign(settings, s);
+  store.set('inv.settings', settings);
+  if (modeChanged) products = settings.mode === 'sheet' ? store.get('inv.cache', []) : localDb().products;
+  setStatus(); render(); refresh(true);
+}
+$('#sSave').onclick = () => {
+  const s = readSettingsForm();
+  if (s.mode === 'sheet' && !/^https:\/\/script\.google(usercontent)?\.com\//.test(s.url)) { toast('Apps Script 웹 앱 URL(https://script.google.com/…)을 입력하세요', true); return; }
+  applySettings(s); hide('settings'); toast('설정을 저장했습니다');
+};
+$('#sTest').onclick = async () => {
+  const s = readSettingsForm();
+  if (s.mode !== 'sheet') { toast('이 기기 저장 모드는 연결이 필요 없습니다'); return; }
+  const saved = { ...settings };
+  Object.assign(settings, s);
+  try { const d = await api('list'); toast(`연결 성공! 상품 ${d.products.length}개`); }
+  catch (e) { toast(e.message, true); }
+  finally { Object.assign(settings, saved); setStatus(); }
+};
+$('#sShare').onclick = async () => {
+  const s = readSettingsForm();
+  if (!s.url) { toast('URL을 먼저 입력하세요', true); return; }
+  const cfg = btoa(unescape(encodeURIComponent(JSON.stringify({ url: s.url, token: s.token }))));
+  const link = location.origin + location.pathname + '#cfg=' + cfg;
+  try {
+    if (navigator.share) await navigator.share({ title: '매장 재고관리 설정', text: '이 링크를 열면 재고관리 앱이 매장 구글 시트에 연결됩니다.', url: link });
+    else { await navigator.clipboard.writeText(link); toast('설정 링크를 복사했습니다. 직원에게만 보내세요.'); }
+  } catch (e) { if (e.name !== 'AbortError') prompt('아래 링크를 복사해 직원에게 보내세요', link); }
+};
+$('#sUpload').onclick = async () => {
+  const local = localDb().products;
+  if (!confirm(`이 기기에 저장된 상품 ${local.length}개를 구글 시트로 보낼까요? (같은 코드는 덮어씀)`)) return;
+  const s = readSettingsForm();
+  applySettings({ ...s, mode: 'sheet' });
+  try { const r = await api('import', { products: local }); toast(`추가 ${r.added}개, 갱신 ${r.updated}개`); refresh(true); }
+  catch (e) { toast(e.message, true); }
+};
+
+// CSV
+function csvCell(v) { v = String(v ?? ''); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+$('#sExport').onclick = () => {
+  const rows = [['코드', '상품명', '수량', '위치', '최소수량', '메모', '수정일시'],
+    ...visible().map((p) => [p.code, p.name, p.qty, p.location, p.minQty, p.memo, p.updatedAt])];
+  // 엑셀에서 바코드가 숫자로 바뀌지 않도록 코드는 ="..." 형식
+  const csv = '﻿' + rows.map((r, i) => r.map((v, j) => (j === 0 && i > 0 ? '="' + String(v).replace(/"/g, '""') + '"' : csvCell(v))).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `재고_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+function parseCsv(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter((r) => r.some((x) => x.trim()));
+}
+$('#sImport').onclick = () => $('#sFile').click();
+$('#sFile').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  let text = await f.text();
+  if (text.includes('�')) { try { text = new TextDecoder('euc-kr').decode(await f.arrayBuffer()); } catch {} } // 엑셀 기본 저장(CP949) 대응
+  let rows = parseCsv(text.replace(/^﻿/, ''));
+  if (rows.length && /코드|code/i.test(rows[0][0])) rows = rows.slice(1);
+  const list = rows.map((r) => {
+    const code = String(r[0] || '').trim().replace(/^="?|"$/g, '');
+    const o = { code, name: (r[1] || '').trim() };
+    if (r.length > 2) o.qty = (r[2] || '').trim().replace(/,/g, '');
+    if (r.length > 3) o.location = r[3] || '';
+    if (r.length > 4) o.minQty = (r[4] || '').trim();
+    if (r.length > 5) o.memo = r[5] || '';
+    return o;
+  }).filter((o) => o.code);
+  if (!list.length) { toast('가져올 상품이 없습니다', true); return; }
+  if (!confirm(`상품 ${list.length}개를 가져올까요? 같은 코드가 있으면 덮어씁니다.`)) return;
+  try { const r = await api('import', { products: list }); toast(`추가 ${r.added}개, 갱신 ${r.updated}개`); refresh(true); }
+  catch (err) { toast(err.message, true); }
+};
+
+// ---------- 이벤트 ----------
+$('#q').addEventListener('input', render);
+$('#q').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const q = $('#q').value.trim();
+  const exact = products.find((p) => p.code === q);
+  const list = visible();
+  if (exact) openDetail(exact.code);
+  else if (list.length === 1) openDetail(list[0].code);
+  e.target.blur();
+});
+$('#chips').onclick = (e) => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } };
+$('#list').onclick = (e) => { const c = e.target.closest('[data-code]'); if (c) openDetail(c.dataset.code); };
+$('#logList').onclick = (e) => {
+  const c = e.target.closest('[data-code]');
+  if (c && products.some((p) => p.code === c.dataset.code)) openDetail(c.dataset.code);
+};
+$$('.tabs button').forEach((b) => (b.onclick = () => switchTab(b.dataset.tab)));
+$('#addBtn').onclick = () => openForm();
+$('#settingsBtn').onclick = openSettings;
+$('#refreshBtn').onclick = () => refresh(false);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && settings.mode === 'sheet') refresh(true); });
+
+// 직원용 설정 링크 (#cfg=...)
+(function readSetupLink() {
+  const m = location.hash.match(/^#cfg=(.+)$/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const cfg = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+    if (cfg.url && confirm('매장 구글 시트에 연결할까요?')) {
+      const user = prompt('작업자 이름을 입력하세요 (기록에 남습니다)', settings.user) || settings.user;
+      applySettings({ mode: 'sheet', url: cfg.url, token: cfg.token || '', user });
+      toast('연결 설정을 마쳤습니다');
+    }
+  } catch { toast('설정 링크가 올바르지 않습니다', true); }
+})();
+
+setStatus();
+render();
+if (settings.mode === 'sheet') refresh(true);
+else if (!settings.user && !store.get('inv.welcomed', false)) {
+  store.set('inv.welcomed', true);
+  setTimeout(() => { toast('여러 기기에서 함께 쓰려면 설정에서 구글 시트를 연결하세요'); }, 600);
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
